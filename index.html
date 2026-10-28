@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<title>MGEO · Simulador de Cobertura RTK 450 MHz</title>
+<meta name="description" content="Simulador de cobertura de sinal RTK UHF 450 MHz com altimetria do terreno - MGEO">
+<meta name="theme-color" content="#111827">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon-192.png">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="assets/logo.js"></script>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#111827; --card:#1f2937; --line:#374151;
+    --txt:#e5e7eb; --mut:#9ca3af; --acc:#38bdf8; --rep:#f97316; --gold:#e8a93b;
+    --good:#00aa00; --med:#ffe600; --bad:#e60000;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--txt);overscroll-behavior:none}
+  #app{display:flex;height:100vh;height:100dvh;width:100vw}
+  #panel{width:350px;min-width:350px;background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:12px 14px 30px}
+  #main{flex:1;position:relative;display:flex;flex-direction:column;min-width:0}
+  #map{flex:1;min-height:200px}
+  .brand{display:flex;align-items:center;gap:10px;background:#fff;border-radius:10px;padding:6px 10px;margin-bottom:10px}
+  .brand img{height:40px}
+  .brand .closeP{margin-left:auto;display:none;color:#111;background:#eee;border-color:#ccc}
+  h1{font-size:16px;margin:0 0 2px}
+  .sub{color:var(--mut);font-size:12px;margin-bottom:12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--acc);margin:0 0 8px}
+  .card.rep h2{color:var(--rep)} .card.rel h2{color:var(--gold)}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:5px 0;font-size:13px}
+  .row small{color:var(--mut)}
+  input[type=number],input[type=text],select{width:115px;background:#0b1220;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:6px 7px;font-size:14px}
+  input[type=text].wide{width:100%} .card.rel input[type=text]{width:170px}
+  input[type=range]{width:140px}
+  .btns{display:flex;gap:6px;flex-wrap:wrap}
+  .btns.modes button{flex:1;padding:8px 4px}
+  button{background:#0b1220;color:var(--txt);border:1px solid var(--line);border-radius:7px;padding:8px 10px;font-size:13px;cursor:pointer;touch-action:manipulation}
+  button:hover{border-color:var(--acc)}
+  button:disabled{opacity:.5;cursor:wait}
+  button.on{background:var(--acc);color:#04121c;border-color:var(--acc);font-weight:600}
+  button.primary{background:var(--acc);color:#04121c;border-color:var(--acc);font-weight:700;width:100%;padding:11px}
+  button.orange{background:var(--rep);color:#1a0a00;border-color:var(--rep);font-weight:700;width:100%;padding:11px}
+  button.gold{background:var(--gold);color:#1a1000;border-color:var(--gold);font-weight:700;width:100%;padding:11px}
+  button.full{width:100%;margin-top:6px}
+  .legend .it{display:flex;align-items:center;gap:8px;font-size:13px;margin:4px 0}
+  .sw{width:16px;height:16px;border-radius:4px;flex:none}
+  .legend .pct{margin-left:auto;color:var(--mut);font-variant-numeric:tabular-nums}
+  #status{font-size:12px;color:var(--mut);margin-top:8px;min-height:16px}
+  .note{font-size:11px;color:var(--mut);line-height:1.45}
+  #repList .ri{font-size:12px;border-top:1px solid var(--line);padding:6px 0;line-height:1.45}
+  #repList .ri b{color:var(--rep)}
+  #hover{position:absolute;top:10px;left:56px;z-index:500;background:rgba(17,24,39,.92);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px;pointer-events:none;display:none;font-variant-numeric:tabular-nums}
+  #hint{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:500;background:rgba(17,24,39,.92);border:1px solid var(--acc);border-radius:20px;padding:7px 14px;font-size:13px;pointer-events:none;max-width:90%;text-align:center}
+  #saveBar{position:absolute;right:12px;bottom:28px;z-index:700;background:rgba(17,24,39,.97);border:1px solid var(--acc);border-radius:12px;padding:12px 14px;display:none;box-shadow:0 6px 24px rgba(0,0,0,.5);max-width:340px}
+  #saveBar .t{font-size:14px;font-weight:700;margin-bottom:8px}
+  #saveBar .btns button{flex:1}
+  #fabs{position:absolute;left:10px;top:84px;z-index:600;display:flex;flex-direction:column;gap:8px}
+  #fabs button{background:#fff;color:#111;border:2px solid rgba(0,0,0,.25);font-weight:700;font-size:12px;padding:7px 9px;border-radius:8px}
+  #fabs #panelBtn{display:none}
+  #busy{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:650;background:rgba(17,24,39,.95);border:1px solid var(--acc);border-radius:20px;padding:6px 14px;font-size:12px;display:none}
+  #profile{display:none;height:230px;background:var(--panel);border-top:1px solid var(--line);position:relative}
+  #profile canvas{width:100%;height:185px;display:block}
+  #profInfo{font-size:12px;padding:6px 12px;color:var(--txt);height:45px;overflow:auto}
+  #profClose{position:absolute;right:8px;top:6px;padding:3px 9px;z-index:2}
+  .tower-ic{filter:drop-shadow(0 1px 2px rgba(0,0,0,.8))}
+  .leaflet-container{background:#1e293b}
+  .leaflet-popup-content{font-size:12px;line-height:1.5}
+  @media (max-width:760px){
+    #panel{position:fixed;left:0;right:0;bottom:0;top:auto;width:100%;min-width:0;height:78dvh;z-index:1000;border-right:none;border-top:2px solid var(--acc);border-radius:16px 16px 0 0;transform:translateY(105%);transition:transform .25s ease;padding-bottom:calc(30px + env(safe-area-inset-bottom))}
+    #panel.open{transform:none}
+    .brand .closeP{display:inline-block}
+    #fabs #panelBtn{display:block;background:var(--acc);border-color:var(--acc)}
+    #fabs{top:auto;bottom:calc(18px + env(safe-area-inset-bottom));left:10px;flex-direction:row}
+    #hint{bottom:auto;top:10px;font-size:12px}
+    #busy{top:46px}
+    #saveBar{left:10px;right:10px;bottom:calc(70px + env(safe-area-inset-bottom));max-width:none}
+    #profile{height:210px} #profile canvas{height:160px}
+    input[type=number],select{width:120px;font-size:16px}
+    .card.rel input[type=text]{width:180px;font-size:16px}
+    .leaflet-control-layers{margin-top:10px!important}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="panel">
+    <div class="brand"><img id="logoImg" alt="MGEO"><button class="closeP" id="closePanel">Fechar</button></div>
+    <h1>Cobertura RTK · UHF 450 MHz</h1>
+    <div class="sub">Toque/clique no mapa para posicionar a torre. A simulação usa a altimetria do terreno (SRTM).</div>
+
+    <div class="card">
+      <h2>Modo do clique</h2>
+      <div class="btns modes">
+        <button id="mTower" class="on">Torre</button>
+        <button id="mRep">Repetidora</button>
+        <button id="mProf">Perfil</button>
+        <button id="mQuery">Consultar</button>
+      </div>
+      <div class="row" style="margin-top:8px"><input id="q" type="text" class="wide" placeholder="Buscar cidade / endereço e Enter" enterkeyhint="search"></div>
+    </div>
+
+    <div class="card">
+      <h2>Torre / Base</h2>
+      <div class="row"><label>Latitude</label><input id="lat" type="number" step="0.000001" inputmode="decimal"></div>
+      <div class="row"><label>Longitude</label><input id="lon" type="number" step="0.000001" inputmode="decimal"></div>
+      <div class="row"><button id="gpsTower">Usar meu GPS</button><button id="goCoord">Posicionar</button></div>
+      <div class="row"><label>Nome da base</label><input id="baseName" type="text" value="Base RTK"></div>
+      <div class="row"><label>Altura da antena (m)</label><input id="hTx" type="number" value="30" min="1" step="1"></div>
+      <div class="row"><small>Altitude do terreno</small><small id="elevTx">—</small></div>
+    </div>
+
+    <div class="card">
+      <h2>Rádio</h2>
+      <div class="row"><label>Frequência (MHz)</label><input id="f" type="number" value="450" min="100" max="1000" step="0.1"></div>
+      <div class="row"><label>Potência TX (W)</label><input id="pW" type="number" value="25" min="0.1" step="0.5"></div>
+      <div class="row"><label>Ganho antena TX (dBi)</label><input id="gTx" type="number" value="6" step="0.5"></div>
+      <div class="row"><label>Perda cabo/conect. (dB)</label><input id="lCable" type="number" value="2" step="0.5"></div>
+      <div class="row"><label>Ganho antena rover (dBi)</label><input id="gRx" type="number" value="3" step="0.5"></div>
+      <div class="row"><label>Altura antena rover (m)</label><input id="hRx" type="number" value="2" min="0.5" step="0.1"></div>
+      <div class="row"><label>Sensibilidade RX (dBm)</label><input id="sens" type="number" value="-110" step="1"></div>
+    </div>
+
+    <div class="card">
+      <h2>Simulação</h2>
+      <div class="row"><label>Raio de análise (km)</label><input id="radius" type="number" value="25" min="1" max="80" step="1"></div>
+      <div class="row"><label>Tratamento do relevo</label>
+        <select id="losMode">
+          <option value="diff">Realista (difração)</option>
+          <option value="cut">Rígido (só visada direta)</option>
+        </select></div>
+      <div class="row"><label>Folga de Fresnel (modo rígido)</label>
+        <select id="fresReq">
+          <option value="0">Só visada geométrica</option>
+          <option value="0.3">30% da 1ª zona</option>
+          <option value="0.6">60% da 1ª zona</option>
+        </select></div>
+      <div class="row"><label>Modelo</label>
+        <select id="model">
+          <option value="2ray">Terra plana + difração</option>
+          <option value="fs">Espaço livre + difração</option>
+        </select></div>
+      <div class="row"><label>Perda por vegetação/obst. (dB)</label><input id="clutter" type="number" value="6" step="1"></div>
+      <div class="row"><label>Limiar BOM ≥ (dBm)</label><input id="thrGood" type="number" value="-90" step="1"></div>
+      <div class="row"><label>Limiar MÉDIO ≥ (dBm)</label><input id="thrMed" type="number" value="-100" step="1"></div>
+      <div class="row"><label>Opacidade</label><input id="opac" type="range" min="0.1" max="1" step="0.05" value="0.8"></div>
+      <div class="row"><label>Escurecer área sem sinal</label><input id="showNone" type="checkbox" checked></div>
+      <div class="row"><label>Mostrar mapa de altimetria</label><input id="showDem" type="checkbox"></div>
+      <button id="run" class="primary" style="margin-top:6px">Simular</button>
+      <div id="status"></div>
+    </div>
+
+    <div class="card rep">
+      <h2>Repetidora</h2>
+      <div class="row"><label>Altura antena repetidora (m)</label><input id="hRep" type="number" value="12" min="1" step="1"></div>
+      <div class="row"><label>Potência repetidora (W)</label><input id="pRep" type="number" value="25" min="0.1" step="0.5"></div>
+      <div class="row"><label>Ganho antena repet. (dBi)</label><input id="gRep" type="number" value="6" step="0.5"></div>
+      <div class="row"><label>Quantas sugerir</label>
+        <select id="nRep"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></div>
+      <div class="note">A repetidora precisa receber a base com sinal ≥ MÉDIO. O cálculo procura os pontos que recuperam mais área sem sinal / sinal ruim.</div>
+      <button id="suggest" class="orange" style="margin-top:8px">Simular visada e sugerir repetidora</button>
+      <button id="clearRep" class="full">Remover repetidoras</button>
+      <div id="repList"></div>
+    </div>
+
+    <div class="card legend">
+      <h2>Legenda</h2>
+      <div class="it"><span class="sw" style="background:var(--good)"></span><span id="lgG">Bom</span><span class="pct" id="pG">—</span></div>
+      <div class="it"><span class="sw" style="background:var(--med)"></span><span id="lgM">Médio</span><span class="pct" id="pM">—</span></div>
+      <div class="it"><span class="sw" style="background:var(--bad)"></span><span id="lgB">Ruim</span><span class="pct" id="pB">—</span></div>
+      <div class="it"><span class="sw" style="background:#373737;opacity:.7"></span><span id="lgN">Sem sinal</span><span class="pct" id="pN">—</span></div>
+      <div class="it"><span class="sw" style="background:#373737;opacity:.7;outline:1px dashed #9ca3af"></span><span>Bloqueado (modo rígido)</span><span class="pct" id="pX">—</span></div>
+      <div class="note" id="demInfo" style="margin-top:6px"></div>
+      <div class="btns" style="margin-top:8px">
+        <button id="saveKmz" style="flex:1">Salvar KMZ</button>
+        <button id="savePng" style="flex:1">Salvar PNG</button>
+      </div>
+    </div>
+
+    <div class="card rel">
+      <h2>Relatório MGEO</h2>
+      <div class="row"><label>Projeto</label><input id="rProj" type="text" placeholder="Ex.: Fazenda Boa Vista"></div>
+      <div class="row"><label>Cliente</label><input id="rCli" type="text"></div>
+      <div class="row"><label>Responsável</label><input id="rResp" type="text"></div>
+      <div class="row"><label>Observações</label><input id="rObs" type="text"></div>
+      <button id="saveReport" class="gold" style="margin-top:6px">Gerar relatório PDF</button>
+    </div>
+
+    <div class="note">
+      Modelo: espaço livre ou terra plana (2 raios) + difração de Bullington (ITU-R P.526) sobre o perfil do terreno, curvatura da Terra (k = 4/3) e altimetria SRTM (~30 m, AWS Terrain Tiles).
+      O SRTM inclui parte da vegetação alta; não modela edificações. Use a "perda por vegetação" para calibrar com medições de campo.
+    </div>
+  </aside>
+
+  <div id="main">
+    <div id="map"></div>
+    <div id="hover"></div>
+    <div id="busy"></div>
+    <div id="hint">Clique no mapa para posicionar a torre</div>
+    <div id="fabs">
+      <button id="panelBtn">Parâmetros</button>
+      <button id="gpsBtn" title="Minha posição">GPS</button>
+    </div>
+    <div id="saveBar">
+      <div class="t">Simulação concluída — deseja salvar?</div>
+      <div class="btns">
+        <button id="sbPdf" class="on">Relatório PDF</button>
+        <button id="sbKmz">KMZ</button>
+        <button id="sbPng">PNG</button>
+      </div>
+      <div class="btns" style="margin-top:6px"><button id="sbClose" style="flex:1">Agora não</button></div>
+    </div>
+    <div id="profile">
+      <button id="profClose">✕</button>
+      <canvas id="profCanvas"></canvas>
+      <div id="profInfo"></div>
+    </div>
+  </div>
+</div>
+<script src="js/app.js"></script>
+<script>
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
